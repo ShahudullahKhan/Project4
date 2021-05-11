@@ -2,8 +2,6 @@
 #include "ball_chaser/DriveToTarget.h"
 #include <sensor_msgs/Image.h>
 #include <iostream>
-#include <algorithm>
-#include <vector>
 
 using namespace std;
 
@@ -14,62 +12,56 @@ ros::ServiceClient client;
 void drive_robot(float lin_x, float ang_z)
 {
     // TODO: Request a service and pass the velocities to it to drive the robot
+    ROS_INFO_STREAM("Driving the robot towards the white ball");
     ball_chaser::DriveToTarget srv;
     srv.request.linear_x = lin_x;
     srv.request.angular_z = ang_z;
-	
-    // Call the command_robot service and pass the requested joint angles
-    if (!client.call(srv)){
-        ROS_ERROR("Failed to call service command_robot");
-    }	
+    if(!client.call(srv)){
+      ROS_ERROR("Failed to execute drive command");
+}
 }
 
+// This callback function continuously executes and reads the image data
 void process_image_callback(const sensor_msgs::Image img)
 {
-    int white_pixel = 255;
-    int fwd_cnt = 0;
-    int left_cnt = 0;
-    int right_cnt = 0;
-    cout << "Image width::::" << img.width << endl;
-    cout << "Image height::::" << img.height << endl;
-    cout << "Image step::::" << img.step << endl;
-	
-    // TODO: 
-    // Loop through each pixel in the image and check if there's a bright white one
-    for (int i = 0; i < img.height * img.step; i += 3) {
-        int index = i % (img.width * 3) / 3;
-	
-        if (img.data[i] == white_pixel && img.data[i + 1] == white_pixel && img.data[i + 2] == white_pixel) {
-            if(index <= 265) {
-		left_cnt += 1;                
-            }
-            if(index > 265 && index <= 533) {
-		fwd_cnt += 1;               
-            }
-            if(index > 533) {
-		right_cnt += 1;                
-            }
-	}
-    }
-		
-    // Then, identify if this pixel falls in the left, mid, or right side of the image
-    vector<int> pos{left_cnt, fwd_cnt, right_cnt};
-    int where_to_go = *max_element(pos.begin(), pos.end());
 
-    // Depending on the white ball position, call the drive_bot function and pass velocities to it.
-    // Request a stop when there's no white ball seen by the camera.
-    if (where_to_go == 0){
-        drive_robot(0.0, 0.0);
-    }
-    else if (where_to_go == left_cnt) {
-	drive_robot(0.0, 0.5);
-    }
-    else if (where_to_go == fwd_cnt) {
-        drive_robot(0.5, 0.0);
-    }
-    else if (where_to_go == right_cnt) {
-        drive_robot(0.0, -0.5);
-    }
+    cout << "Image width:::" << img.width << endl;
+    cout << "Image height:::" << img.height << endl;
+    cout << "Image step:::" << img.step << endl;
+    int white_pixel = 255;
+
+    // TODO: Loop through each pixel in the image and check if there's a bright white one
+    int left = img.step/3;
+    int right = 2*(img.step/3);
+    bool is_white = false;
+    int img_dim = img.height*img.step;
+    int pos;
+    for(int i=0; i<img_dim; i=i+3){
+      if(img.data[i] == white_pixel && img.data[i+1] == white_pixel && img.data[i+2] == white_pixel){
+        is_white = true;
+        cout << "Value of i:::" << i << endl;
+        pos = i%img.step;
+        cout << "Value of pos:::" << pos << endl;
+}
+}
+    // Then, identify if this pixel falls in the left, mid, or right side of the image
+    // Depending on the white ball position, call the drive_bot function and pass velocities to it
+    if (pos <= left){
+      cout << "Moving Left" << endl;
+      drive_robot(0.0, 0.5);
+}
+    else if (pos >= right){
+      cout << "Moving Right" << endl;
+      drive_robot(0.0, -0.5);
+}
+    else {
+      cout << "Moving Center" << endl;
+      drive_robot(0.5, 0.0);
+}
+    // Request a stop when there's no white ball seen by the camera
+    if (is_white == false){
+      drive_robot(0.0, 0.0);
+}
 }
 
 int main(int argc, char** argv)
